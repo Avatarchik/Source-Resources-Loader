@@ -287,10 +287,17 @@ public class BspSceneLoader : MonoBehaviour
             MeshRenderer.sharedMaterial = MaterialLoader.Load(BSP_TexStrData[i]);
             MeshRenderer.sharedMaterial.SetTexture("_LightMap", LightMap);
 
-            if (BSP_TexStrData[i].Contains("TOOLS/"))
-                MeshRenderer.enabled = false;
-
             MeshFilter.sharedMesh = new Mesh();
+
+            MeshCollider MeshCollider 
+                = MeshObject.AddComponent<MeshCollider>();
+
+            if (BSP_TexStrData[i].Contains("TOOLS/"))
+            {
+                MeshCollider.enabled = false;
+                MeshRenderer.enabled = false;
+            }
+
             MeshFilter.sharedMesh.vertices = Vertices.ToArray();
             MeshFilter.sharedMesh.triangles = Triangles.ToArray();
 
@@ -359,6 +366,8 @@ public class BspSceneLoader : MonoBehaviour
             MeshRenderer.sharedMaterial.SetTexture("_LightMap", LightMap);
 
             MeshFilter.sharedMesh = new Mesh();
+            MeshObject.AddComponent<MeshCollider>();
+
             MeshFilter.sharedMesh.vertices = Vertices.ToArray();
             MeshFilter.sharedMesh.triangles = Triangles.ToArray();
             MeshFilter.sharedMesh.colors32 = Colors.ToArray();

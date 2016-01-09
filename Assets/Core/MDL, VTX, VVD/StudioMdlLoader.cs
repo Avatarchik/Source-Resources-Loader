@@ -146,7 +146,11 @@ public class StudioMdlLoader : MdlSpecification
         }
 
         SkinnedMeshRenderer smr = ModelObject.AddComponent<SkinnedMeshRenderer>();
+
         smr.sharedMesh = new Mesh();
+
+        MeshCollider MeshCollider = ModelObject.AddComponent<MeshCollider>();
+        MeshCollider.sharedMesh = smr.sharedMesh;
 
         Matrix4x4[] bindPoses = new Matrix4x4[MDL_Bones.Count];
         for (int i = 0; i < bindPoses.Length; i++)
