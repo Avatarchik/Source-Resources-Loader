@@ -145,29 +145,39 @@ public class StudioMdlLoader : MdlSpecification
             pUvBuffer.Add(VVD_Vertexes[pModel.vertexindex + i].m_vecTexCoord);
         }
 
-        SkinnedMeshRenderer smr = ModelObject.AddComponent<SkinnedMeshRenderer>();
+        Mesh pMesh = new Mesh();
+        ModelObject.AddComponent<MeshCollider>().sharedMesh = pMesh;
 
-        smr.sharedMesh = new Mesh();
+        pMesh.subMeshCount = vLod.numMeshes;
+        pMesh.vertices = pVertices.ToArray();
+        pMesh.normals = pNormals.ToArray();
+        pMesh.uv = pUvBuffer.ToArray();
 
-        MeshCollider MeshCollider = ModelObject.AddComponent<MeshCollider>();
-        MeshCollider.sharedMesh = smr.sharedMesh;
+        pMesh.Optimize();
 
-        Matrix4x4[] bindPoses = new Matrix4x4[MDL_Bones.Count];
-        for (int i = 0; i < bindPoses.Length; i++)
-            bindPoses[i] = MDL_Bones[i].worldToLocalMatrix * ModelObject.transform.localToWorldMatrix;
+        if (MDL_Bones.Count > 1)
+        {
+            SkinnedMeshRenderer smr = ModelObject.AddComponent<SkinnedMeshRenderer>();
+            Matrix4x4[] bindPoses = new Matrix4x4[MDL_Bones.Count];
 
-        smr.sharedMesh.subMeshCount = vLod.numMeshes;
-        smr.sharedMesh.vertices = pVertices.ToArray();
-        smr.sharedMesh.normals = pNormals.ToArray();
-        smr.sharedMesh.uv = pUvBuffer.ToArray();
+            for (int i = 0; i < bindPoses.Length; i++)
+                bindPoses[i] = MDL_Bones[i].worldToLocalMatrix * ModelObject.transform.localToWorldMatrix;
 
-        smr.sharedMesh.boneWeights = pBoneWeight.ToArray();
-        smr.sharedMesh.bindposes = bindPoses;
+            pMesh.boneWeights = pBoneWeight.ToArray();
+            pMesh.bindposes = bindPoses;
 
-        smr.sharedMesh.Optimize();
+            smr.sharedMesh = pMesh;
 
-        smr.bones = MDL_Bones.ToArray();
-        smr.updateWhenOffscreen = true;
+            smr.bones = MDL_Bones.ToArray();
+            smr.updateWhenOffscreen = true;
+        }
+        else
+        {
+            MeshFilter MeshFilter = ModelObject.AddComponent<MeshFilter>();
+            ModelObject.AddComponent<MeshRenderer>();
+
+            MeshFilter.sharedMesh = pMesh;
+        }
 
         for (int i = 0; i < vLod.numMeshes; i++)
         {
@@ -189,7 +199,7 @@ public class StudioMdlLoader : MdlSpecification
                     pIndices.Add(pVertexBuffer[Indices[n]].origMeshVertID + pStudioMesh.vertexoffset);
             }
 
-            smr.sharedMesh.SetTriangles(pIndices.ToArray(), i);
+            pMesh.SetTriangles(pIndices.ToArray(), i);
             string MaterialPath = string.Empty;
 
             foreach (string TDir in MDL_TDirectories)

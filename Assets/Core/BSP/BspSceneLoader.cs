@@ -276,6 +276,8 @@ public class BspSceneLoader : MonoBehaviour
             GameObject MeshObject = new GameObject(BSP_TexStrData[i]);
             MeshObject.transform.parent = Model.transform;
 
+            MeshObject.isStatic = true;
+
             MeshRenderer MeshRenderer = MeshObject.AddComponent<MeshRenderer>();
             MeshFilter MeshFilter = MeshObject.AddComponent<MeshFilter>();
 
@@ -353,6 +355,8 @@ public class BspSceneLoader : MonoBehaviour
             GameObject MeshObject = new GameObject(BSP_TexStrData[i]);
             MeshObject.transform.localScale = new Vector3(1, 1, -1);
             MeshObject.transform.parent = BSP_WorldSpawn.transform;
+
+            MeshObject.isStatic = true;
 
             MeshRenderer MeshRenderer = MeshObject.AddComponent<MeshRenderer>();
             MeshFilter MeshFilter = MeshObject.AddComponent<MeshFilter>();
@@ -609,10 +613,11 @@ public class BspSceneLoader : MonoBehaviour
                     string StaticPropName = Entries[StaticPropLump_t.m_PropType].Replace(".mdl", "");
 
                     if (Configuration.Models.ContainsKey(StaticPropName))
-                        mdlTransform = Transform.Instantiate(Configuration.Models[StaticPropName]) as Transform;
+                        mdlTransform = Instantiate(Configuration.Models[StaticPropName]) as Transform;
                     else
                         mdlTransform = StudioMdlLoader.Load(StaticPropName);
 
+                    mdlTransform.gameObject.isStatic = true;
                     mdlTransform.localPosition = Configuration.SwapZY(StaticPropLump_t.m_Origin) * Configuration.WorldScale;
 
                     Vector3 mdlRotation = new Vector3(StaticPropLump_t.m_Angles.z, -StaticPropLump_t.m_Angles.y, StaticPropLump_t.m_Angles.x);
