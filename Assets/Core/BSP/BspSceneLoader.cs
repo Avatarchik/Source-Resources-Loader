@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEditor;
 using Ionic.Zip;
 
@@ -22,13 +22,29 @@ public class BspEditor : Editor
 
         if (GUILayout.Button("Clear Source Map"))
             BspLoader.Clear();
+
+		if (GUILayout.Button("On/Off Show Brushes"))
+		{
+			foreach(GameObject Obj in Configuration.Brushes)
+			{
+				MeshRenderer MeshRenderer = Obj.GetComponent<MeshRenderer>();
+
+				switch (MeshRenderer.enabled)
+				{
+					case false: MeshRenderer.enabled = true; break;
+					case true: MeshRenderer.enabled = false; break;
+				}
+			}
+		}
     }
 }
 
 public class BspSceneLoader : MonoBehaviour
 {
     private CustomReader CRead;
+
     public string LevelName;
+	public bool HighDynamicRange;
 
     private BspSpecification.dheader_t BSP_Header;
     private List<string> BSP_Entities;
@@ -71,7 +87,7 @@ public class BspSceneLoader : MonoBehaviour
             DestroyImmediate(BSP_WorldSpawn);
 
         RenderSettings.skybox = null;
-        Resources.UnloadUnusedAssets();
+		Resources.UnloadUnusedAssets();
     }
 
     public void Load()
@@ -87,7 +103,10 @@ public class BspSceneLoader : MonoBehaviour
         BSP_Header = CRead.ReadType<BspSpecification.dheader_t>();
 
         if (BSP_Header.ident != (('P' << 24) + ('S' << 16) + ('B' << 8) + 'V'))
-            throw new FileLoadException("Wrong magic number");
+			throw new FileLoadException("Wrong magic number");
+
+		if (BSP_Header.version < 19 || BSP_Header.version > 21)
+			throw new FileLoadException(string.Format("BSP version ({0}) isn't supported", BSP_Header.version));
 
         if (BSP_Header.lumps[0].fileofs == 0)
         {
@@ -103,7 +122,7 @@ public class BspSceneLoader : MonoBehaviour
         foreach (Match match in Regex.Matches(input, @"{[^}]*}", RegexOptions.IgnoreCase))
             BSP_Entities.Add(match.Value);
 
-        if (BSP_Header.version <= 20) BSP_Faces.AddRange(CRead.ReadType<BspSpecification.dface_t>(BSP_Header.lumps[7].filelen / 56, BSP_Header.lumps[7].fileofs));
+		if (!HighDynamicRange) BSP_Faces.AddRange(CRead.ReadType<BspSpecification.dface_t>(BSP_Header.lumps[7].filelen / 56, BSP_Header.lumps[7].fileofs));
         else BSP_Faces.AddRange(CRead.ReadType<BspSpecification.dface_t>(BSP_Header.lumps[58].filelen / 56, BSP_Header.lumps[58].fileofs));
 
         BSP_Models.AddRange(CRead.ReadType<BspSpecification.dmodel_t>(BSP_Header.lumps[14].filelen / 48, BSP_Header.lumps[14].fileofs));
@@ -279,32 +298,36 @@ public class BspSceneLoader : MonoBehaviour
             MeshObject.isStatic = true;
 
             MeshRenderer MeshRenderer = MeshObject.AddComponent<MeshRenderer>();
-            MeshFilter MeshFilter = MeshObject.AddComponent<MeshFilter>();
-
-            List<Vector2> UV2 = new List<Vector2>();
-            Texture2D LightMap = new Texture2D(1, 1);
-
-            CreateLightMap(FaceList, ref LightMap, ref UV2);
-
             MeshRenderer.sharedMaterial = MaterialLoader.Load(BSP_TexStrData[i]);
-            MeshRenderer.sharedMaterial.SetTexture("_LightMap", LightMap);
 
+			MeshFilter MeshFilter = MeshObject.AddComponent<MeshFilter>();
             MeshFilter.sharedMesh = new Mesh();
 
-            MeshCollider MeshCollider 
-                = MeshObject.AddComponent<MeshCollider>();
+			MeshFilter.sharedMesh.vertices = Vertices.ToArray();
+			MeshFilter.sharedMesh.triangles = Triangles.ToArray();
+			MeshFilter.sharedMesh.uv = UV.ToArray();
 
-            if (BSP_TexStrData[i].Contains("TOOLS/"))
-            {
-                MeshCollider.enabled = false;
-                MeshRenderer.enabled = false;
-            }
+			if (BSP_TexStrData[i].Contains("TOOLS/"))
+			{
+				if (BSP_TexStrData[i].Contains("TRIGGER"))
+					MeshObject.AddComponent<BoxCollider>().isTrigger = true;
 
-            MeshFilter.sharedMesh.vertices = Vertices.ToArray();
-            MeshFilter.sharedMesh.triangles = Triangles.ToArray();
+				MeshRenderer.enabled = false;
+				Configuration.Brushes.Add(MeshObject);
+			}
+			else
+			{
+				List<Vector2> UV2 = new List<Vector2>();
+				Texture2D LightMap = new Texture2D(1, 1);
 
-            MeshFilter.sharedMesh.uv = UV.ToArray();
-            MeshFilter.sharedMesh.uv2 = UV2.ToArray();
+				CreateLightMap(FaceList, ref LightMap, ref UV2);
+				MeshRenderer.sharedMaterial.SetTexture("_LightMap", LightMap);
+
+				MeshFilter.sharedMesh.uv2 = UV2.ToArray();
+
+				if (modelIndex == 0)
+					MeshObject.AddComponent<MeshCollider>();
+			}
 
             MeshFilter.sharedMesh.RecalculateNormals();
             MeshFilter.sharedMesh.Optimize();
@@ -366,8 +389,8 @@ public class BspSceneLoader : MonoBehaviour
 
             CreateLightMap(FaceList, ref LightMap, ref UV2);
 
-            MeshRenderer.sharedMaterial = MaterialLoader.Load(BSP_TexStrData[i]);
-            MeshRenderer.sharedMaterial.SetTexture("_LightMap", LightMap);
+			MeshRenderer.sharedMaterial = MaterialLoader.Load(BSP_TexStrData[i]);
+			MeshRenderer.sharedMaterial.SetTexture("_LightMap", LightMap);
 
             MeshFilter.sharedMesh = new Mesh();
             MeshObject.AddComponent<MeshCollider>();
@@ -523,12 +546,12 @@ public class BspSceneLoader : MonoBehaviour
 
         for (int i = 0; i < inpFaces.Count; i++)
         {
+			int LightMapOffset = BSP_Faces[inpFaces[i].index].lightofs;
+			if (LightMapOffset == -1) continue;
+
             LightMaps[i] = new Texture2D(inpFaces[i].lightMapW, inpFaces[i].lightMapH, TextureFormat.RGB24, false);
-
             Color32[] TexPixels = new Color32[inpFaces[i].lightMapW * inpFaces[i].lightMapH];
-            int LightMapOffset = BSP_Faces[inpFaces[i].index].lightofs;
 
-            if (LightMapOffset == -1) continue;
             for (int n = 0; n < TexPixels.Length; n++)
             {
                 BspSpecification.ColorRGBExp32 ColorRGBExp32 = TexLightToLinear(LightMapOffset + (n * 4));
@@ -549,7 +572,7 @@ public class BspSceneLoader : MonoBehaviour
 
     private BspSpecification.ColorRGBExp32 TexLightToLinear(long Offset)
     {
-        if (BSP_Header.version <= 20) Offset += BSP_Header.lumps[8].fileofs;
+		if (!HighDynamicRange) Offset += BSP_Header.lumps[8].fileofs;
         else Offset += BSP_Header.lumps[53].fileofs;
 
         BspSpecification.ColorRGBExp32 ColorRGBExp32 = CRead.ReadType<BspSpecification.ColorRGBExp32>(Offset);
@@ -563,21 +586,16 @@ public class BspSceneLoader : MonoBehaviour
 
     private void LoadStaticProps()
     {
-        CRead.BR().BaseStream.Position = BSP_Header.lumps[35].fileofs;
+		int GameLumpCount = CRead.BR(BSP_Header.lumps[35].fileofs).ReadInt32();
 
-        GameObject StaticProps = new GameObject(BSP_WorldSpawn.name + "_props");
-        StaticProps.transform.parent = BSP_WorldSpawn.transform;
-
-        int GameLumpCount = CRead.BR().ReadInt32();
-
-        BspSpecification.dgamelump_t[] GameLumps =
+        BspSpecification.dgamelump_t[] BSP_GameLump =
             CRead.ReadType<BspSpecification.dgamelump_t>(GameLumpCount, 0);
 
         for (int i = 0; i < GameLumpCount; i++)
         {
-            if (GameLumps[i].id == 1936749168)
+			if (BSP_GameLump[i].id == 1936749168)
             {
-                CRead.BR().BaseStream.Position = GameLumps[i].fileofs;
+				CRead.BR().BaseStream.Position = BSP_GameLump[i].fileofs;
 
                 int DictEntries = CRead.BR().ReadInt32();
                 string[] Entries = new string[DictEntries];
@@ -591,7 +609,7 @@ public class BspSceneLoader : MonoBehaviour
                 }
 
                 int LeafEntries = CRead.BR().ReadInt32();
-                CRead.ReadType<ushort>(LeafEntries, 0);
+				CRead.ReadType<ushort>(LeafEntries, 0);
 
                 int nStaticProps = CRead.BR().ReadInt32();
                 for (int l = 0; l < nStaticProps; l++)
@@ -599,7 +617,7 @@ public class BspSceneLoader : MonoBehaviour
                     BspGameLump.StaticPropLumpV4_t StaticPropLump_t =
                         CRead.ReadType<BspGameLump.StaticPropLumpV4_t>();
 
-                    switch (GameLumps[i].version)
+					switch (BSP_GameLump[i].version)
                     {
                         case 5: CRead.ReadType<BspGameLump.StaticPropLumpV5_t>(); break;
                         case 6: CRead.ReadType<BspGameLump.StaticPropLumpV6_t>(); break;
@@ -607,23 +625,27 @@ public class BspSceneLoader : MonoBehaviour
                         case 8: CRead.ReadType<BspGameLump.StaticPropLumpV8_t>(); break;
                         case 9: CRead.ReadType<BspGameLump.StaticPropLumpV9_t>(); break;
                         case 10: CRead.ReadType<BspGameLump.StaticPropLumpV10_t>(); break;
+
+						// TODO: For CS:GO maps
+						// case 10: CRead.ReadType<BspGameLump.StaticPropLumpV10_CSGO_t>(); break;
                     }
 
-                    Transform mdlTransform = default(Transform);
+                    Transform MdlTransform = default(Transform);
                     string StaticPropName = Entries[StaticPropLump_t.m_PropType].Replace(".mdl", "");
 
-                    if (Configuration.Models.ContainsKey(StaticPropName))
-                        mdlTransform = Instantiate(Configuration.Models[StaticPropName]) as Transform;
-                    else
-                        mdlTransform = StudioMdlLoader.Load(StaticPropName);
+					switch (Configuration.Models.ContainsKey(StaticPropName))
+					{
+						case true: MdlTransform = Instantiate(Configuration.Models[StaticPropName]) as Transform; break;
+						case false: MdlTransform = StudioMdlLoader.Load(StaticPropName); break;
+					}
 
-                    mdlTransform.gameObject.isStatic = true;
-                    mdlTransform.localPosition = Configuration.SwapZY(StaticPropLump_t.m_Origin) * Configuration.WorldScale;
+					Vector3 MdlRotation = new Vector3(StaticPropLump_t.m_Angles.z, -StaticPropLump_t.m_Angles.y, StaticPropLump_t.m_Angles.x);
 
-                    Vector3 mdlRotation = new Vector3(StaticPropLump_t.m_Angles.z, -StaticPropLump_t.m_Angles.y, StaticPropLump_t.m_Angles.x);
-                    mdlTransform.eulerAngles = mdlRotation;
+                    MdlTransform.localPosition = Configuration.SwapZY(StaticPropLump_t.m_Origin) * Configuration.WorldScale;
+                    MdlTransform.eulerAngles = MdlRotation;
 
-                    mdlTransform.parent = StaticProps.transform;
+					MdlTransform.gameObject.isStatic = true;
+                    MdlTransform.parent = BSP_WorldSpawn.transform;
                 }
             }
         }
@@ -631,7 +653,7 @@ public class BspSceneLoader : MonoBehaviour
 
     private void CreateSkybox(List<string> data)
     {
-        string skyname = data[data.FindIndex(n => n == "skyname") + 1].Replace("_hdr", "");
+        string skyname = data[data.FindIndex(n => n == "skyname") + 1];
         Material SkyMaterial = new Material(Shader.Find("Mobile/Skybox"));
 
         foreach (string alpString in new string[] { "_FrontTex", "_BackTex", "_LeftTex", "_RightTex", "_UpTex" })

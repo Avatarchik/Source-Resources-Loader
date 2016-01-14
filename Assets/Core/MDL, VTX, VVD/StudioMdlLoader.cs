@@ -67,8 +67,8 @@ public class StudioMdlLoader : MdlSpecification
         VTX_Header = CRead.ReadType<FileHeader_t>();
         ParseVtxFile();
 
-        if (!Configuration.Models.ContainsKey(ModelObject.name))
-            Configuration.Models.Add(ModelName, ModelObject.transform);
+		if (!Configuration.Models.ContainsKey(ModelObject.name))
+			Configuration.Models.Add(ModelName, ModelObject.transform);
 
         CRead.Dispose();
         return ModelObject.transform;
@@ -106,12 +106,12 @@ public class StudioMdlLoader : MdlSpecification
             int StringInputFilePosition = MDL_Header.bone_offset + (Marshal.SizeOf(typeof(mstudiobone_t)) * i) + MDL_BonesInfo[i].sznameindex;
 
             GameObject BoneObject = new GameObject(CRead.ReadNullTerminatedString(StringInputFilePosition));
-            BoneObject.transform.parent = ModelObject.transform;
+			BoneObject.transform.parent = ModelObject.transform;
 
             MDL_Bones.Add(BoneObject.transform);
 
             if (MDL_BonesInfo[i].parent >= 0)
-                MDL_Bones[i].transform.parent = MDL_Bones[MDL_BonesInfo[i].parent].transform;
+                MDL_Bones[i].parent = MDL_Bones[MDL_BonesInfo[i].parent];
         }
     }
 
@@ -149,12 +149,11 @@ public class StudioMdlLoader : MdlSpecification
         ModelObject.AddComponent<MeshCollider>().sharedMesh = pMesh;
 
         pMesh.subMeshCount = vLod.numMeshes;
+
         pMesh.vertices = pVertices.ToArray();
         pMesh.normals = pNormals.ToArray();
         pMesh.uv = pUvBuffer.ToArray();
-
-        pMesh.Optimize();
-
+        
         if (MDL_Bones.Count > 1)
         {
             SkinnedMeshRenderer smr = ModelObject.AddComponent<SkinnedMeshRenderer>();
@@ -212,7 +211,8 @@ public class StudioMdlLoader : MdlSpecification
                 pMaterials.Add(MaterialLoader.Load(MaterialPath));
         }
 
-        ModelObject.renderer.sharedMaterials = pMaterials.ToArray();
+		pMesh.Optimize();
+		ModelObject.GetComponent<Renderer>().sharedMaterials = pMaterials.ToArray();
     }
 
     private static BoneWeight GetBoneWeight(mstudioboneweight_t mBoneWeight)

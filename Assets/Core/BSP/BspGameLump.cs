@@ -70,22 +70,36 @@ public class BspGameLump
         public byte[] m_DiffuseModulation;
 
         public bool DisableX360;
+
+		[MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
+		public byte[] unknown;
     }
 
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public struct StaticPropLumpV10_t
     {
-        public float m_flForcedFadeScale;
-        public byte m_nMinCPULevel;
-        public byte m_nMaxCPULevel;
-        public byte m_nMinGPULevel;
-        public byte m_nMaxGPULevel;
+		public float m_flForcedFadeScale;
+		public ushort m_nMinDXLevel;
+		public ushort m_nMaxDXLevel;
 
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
-        public byte[] m_DiffuseModulation;
-
-        public float unknown;
-
-        public bool DisableX360;
+		public int lightmapResolutionX;
+		public int lightmapResolutionY;
     }
+
+	[StructLayout(LayoutKind.Sequential, Pack = 1)]
+	public struct StaticPropLumpV10_CSGO_t
+	{
+		public float m_flForcedFadeScale;
+		public byte m_nMinCPULevel;
+		public byte m_nMaxCPULevel;
+		public byte m_nMinGPULevel;
+		public byte m_nMaxGPULevel;
+		
+		[MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
+		public byte[] m_DiffuseModulation;
+		
+		public float unknown;
+		
+		public bool DisableX360;
+	}
 }

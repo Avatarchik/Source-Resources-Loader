@@ -44,5 +44,38 @@ public class SourceEntityInfo : MonoBehaviour
             string[] Array = data[data.FindIndex(n => n == "_ambient") + 1].Split(new char[] { ' ' });
             RenderSettings.ambientLight = new Color32(byte.Parse(Array[0]), byte.Parse(Array[1]), byte.Parse(Array[2]), 255);
         }
+
+		if (Classname.Contains("func_") && !Classname.Equals("func_illusionary"))
+		{
+			for (int i = 0; i < gameObject.transform.childCount; i++)
+			{
+				Transform Child = gameObject.transform.GetChild(i);
+				Child.gameObject.AddComponent<MeshCollider>();
+            }
+        }
+
+		if (data.Contains("rendercolor"))
+		{
+			string[] Array = data[data.FindIndex(n => n == "rendercolor") + 1].Split(new char[] { ' ' });
+			for (int i = 0; i < gameObject.transform.childCount; i++)
+			{
+				Color32 RenderColor = new Color32(byte.Parse(Array[0]), byte.Parse(Array[1]), byte.Parse(Array[2]), 255);
+
+				Transform Child = gameObject.transform.GetChild(i);
+				Child.gameObject.GetComponent<MeshRenderer>().sharedMaterial.color = RenderColor;
+            }
+        }
+        
+        if (data.Contains("rendermode"))
+		{
+			if (data[data.FindIndex(n => n == "rendermode") + 1] == "10")
+			{
+				for (int i = 0; i < gameObject.transform.childCount; i++)
+				{
+					Transform Child = gameObject.transform.GetChild(i);
+					Child.gameObject.GetComponent<MeshRenderer>().enabled = false;
+                }
+            }
+        }
     }
 }
